@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scrabble – One Line</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/themes/base/jquery-ui.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Georgia', serif;
+    background: #2d5a1b;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    color: #fff;
+  }
+  h1 { font-size: 2.2rem; letter-spacing: 0.12em; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin-bottom: 6px; }
+  .subtitle { font-size: 0.9rem; opacity: 0.8; margin-bottom: 20px; }
+
+  .score-bar {
+    display: flex; gap: 20px; align-items: center;
+    background: rgba(0,0,0,0.3); border-radius: 10px;
+    padding: 10px 24px; margin-bottom: 18px;
+    flex-wrap: wrap; justify-content: center;
+  }
+  .score-item { text-align: center; }
+  .score-label { font-size: 0.7rem; letter-spacing: 0.1em; opacity: 0.7; }
+  .score-value { font-size: 1.5rem; font-weight: bold; }
+  .score-divider { width: 1px; height: 36px; background: rgba(255,255,255,0.3); }
+
+  .board-container { background: rgba(0,0,0,0.25); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+  .board-row { display: flex; gap: 4px; }
+  .board-square {
+    width: 56px; height: 56px; border-radius: 4px;
+    position: relative; display: flex; align-items: center; justify-content: center;
+    font-size: 0.42rem; font-weight: bold; letter-spacing: 0.04em;
+    text-align: center; line-height: 1.1;
+    border: 1px solid rgba(0,0,0,0.2);
+    transition: transform 0.1s, box-shadow 0.1s;
+    cursor: default;
+  }
+  .square-normal { background: #c8b97a; color: #7a5c1e; }
+  .square-dl     { background: #a8d4e6; color: #1a5a7a; }
+  .square-tl     { background: #5b8dc9; color: #fff; }
+  .square-dw     { background: #f4a0a0; color: #8b1a1a; }
+  .square-tw     { background: #e85c5c; color: #fff; }
+  .square-star   { background: #f4a0a0; color: #8b1a1a; }
+  .board-square.ui-droppable-active  { outline: 2px dashed rgba(255,255,255,0.5); }
+  .board-square.ui-droppable-hover   { transform: scale(1.08); box-shadow: 0 0 12px rgba(255,255,255,0.7); }
+  .board-square.occupied { cursor: not-allowed; }
+
+  .rack-area { display: flex; flex-direction: column; align-items: center; margin-bottom: 18px; }
+  .rack-label { font-size: 0.75rem; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 8px; }
+  .rack-holder {
+    background: #8B5E3C; border: 3px solid #5a3a1e; border-radius: 8px;
+    padding: 10px 14px; display: flex; gap: 6px;
+    min-height: 76px; min-width: 420px; align-items: center;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .rack-slot {
+    width: 52px; height: 52px;
+    background: rgba(0,0,0,0.15); border-radius: 4px;
+    border: 1px dashed rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .tile {
+    width: 52px; height: 52px;
+    background: linear-gradient(145deg, #f5dfa0, #d4a836);
+    border: 2px solid #8b6914; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    cursor: grab; user-select: none;
+    box-shadow: 2px 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3);
+    position: relative; z-index: 10;
+  }
+  .tile:hover { box-shadow: 3px 3px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.3); }
+  .tile.ui-draggable-dragging { cursor: grabbing; box-shadow: 6px 6px 16px rgba(0,0,0,0.5); z-index: 1000; }
+  .tile-letter { font-size: 1.55rem; font-weight: bold; color: #1a0a00; line-height: 1; font-family: 'Georgia', serif; }
+  .tile-value  { font-size: 0.55rem; color: #3a1a00; font-weight: bold; position: absolute; bottom: 3px; right: 5px; }
+  .tile.placed { cursor: not-allowed; opacity: 0.9; box-shadow: 1px 1px 3px rgba(0,0,0,0.3); }
+
+  .word-display {
+    background: rgba(0,0,0,0.3); border-radius: 10px;
+    padding: 12px 24px; margin-bottom: 14px; text-align: center; min-width: 320px;
+  }
+  .word-label { font-size: 0.7rem; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 4px; }
+  .word-value { font-size: 1.8rem; letter-spacing: 0.2em; min-height: 36px; color: #f5dfa0; }
+  .word-score { font-size: 0.9rem; opacity: 0.8; margin-top: 4px; }
+
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
+  button {
+    padding: 10px 22px; border: none; border-radius: 6px;
+    font-size: 0.9rem; font-weight: bold; cursor: pointer; letter-spacing: 0.05em;
+    transition: transform 0.1s, box-shadow 0.1s; box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  }
+  button:hover   { transform: translateY(-1px); box-shadow: 0 5px 12px rgba(0,0,0,0.4); }
+  button:active  { transform: translateY(1px); }
+  .btn-submit { background: #f5dfa0; color: #1a0a00; }
+  .btn-deal   { background: #5b8dc9; color: #fff; }
+  .btn-reset  { background: #e85c5c; color: #fff; }
+  .btn-recall { background: #8b6914; color: #f5dfa0; }
+
+  .history {
+    background: rgba(0,0,0,0.25); border-radius: 10px;
+    padding: 12px 20px; max-width: 500px; width: 100%;
+    max-height: 160px; overflow-y: auto;
+  }
+  .history h3 { font-size: 0.75rem; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 8px; }
+  .history-entry { display: flex; justify-content: space-between; font-size: 0.9rem; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .history-entry:last-child { border-bottom: none; }
+  .history-word { color: #f5dfa0; letter-spacing: 0.1em; }
+  .history-pts  { color: #a8d4e6; font-weight: bold; }
+
+  #message {
+    min-height: 24px; font-size: 0.9rem; text-align: center;
+    padding: 6px 16px; border-radius: 6px; margin-bottom: 10px;
+  }
+  #message.info    { background: rgba(168,212,230,0.2); color: #a8d4e6; }
+  #message.success { background: rgba(100,200,100,0.2); color: #8debb0; }
+  #message.error   { background: rgba(232,92,92,0.2);   color: #f4a0a0; }
+</style>
+</head>
+<body>
+
+<h1>SCRABBLE</h1>
+<p class="subtitle">One-Line Board &nbsp;·&nbsp; Drag tiles to score!</p>
+
+<div class="score-bar">
+  <div class="score-item">
+    <div class="score-label">GAME SCORE</div>
+    <div class="score-value" id="totalScore">0</div>
+  </div>
+  <div class="score-divider"></div>
+  <div class="score-item">
+    <div class="score-label">TILES LEFT IN BAG</div>
+    <div class="score-value" id="tilesLeft">93</div>
+  </div>
+  <div class="score-divider"></div>
+  <div class="score-item">
+    <div class="score-label">WORDS PLAYED</div>
+    <div class="score-value" id="wordsPlayed">0</div>
+  </div>
+</div>
+
+<div class="board-container">
+  <div class="board-row" id="board"></div>
+</div>
+
+<div class="word-display">
+  <div class="word-label">WORD ON BOARD</div>
+  <div class="word-value" id="wordDisplay">&nbsp;</div>
+  <div class="word-score" id="liveScore">&nbsp;</div>
+</div>
+
+<div id="message" class="info">&nbsp;</div>
+
+<div class="btn-row">
+  <button class="btn-submit" onclick="submitWord()">Submit Word</button>
+  <button class="btn-recall" onclick="recallTiles()">Recall Tiles</button>
+  <button class="btn-deal"   onclick="dealNewHand()">Deal New Hand</button>
+  <button class="btn-reset"  onclick="resetGame()">New Game</button>
+</div>
+
+<div class="rack-area">
+  <div class="rack-label">YOUR RACK</div>
+  <div class="rack-holder" id="rack"></div>
+</div>
+
+<div class="history">
+  <h3>WORD HISTORY</h3>
+  <div id="historyList"></div>
+</div>
+
+<script>
+// ── Tile data (from pieces.json / ScrabbleTiles JS)
+var ScrabbleTiles = {};
+[{l:"A",v:1,n:9},{l:"B",v:3,n:2},{l:"C",v:3,n:2},{l:"D",v:2,n:4},
+ {l:"E",v:1,n:12},{l:"F",v:4,n:2},{l:"G",v:2,n:3},{l:"H",v:4,n:2},
+ {l:"I",v:1,n:9},{l:"J",v:8,n:1},{l:"K",v:5,n:1},{l:"L",v:1,n:4},
+ {l:"M",v:3,n:2},{l:"N",v:1,n:6},{l:"O",v:1,n:8},{l:"P",v:3,n:2},
+ {l:"Q",v:10,n:1},{l:"R",v:1,n:6},{l:"S",v:1,n:4},{l:"T",v:1,n:6},
+ {l:"U",v:1,n:4},{l:"V",v:4,n:2},{l:"W",v:4,n:2},{l:"X",v:8,n:1},
+ {l:"Y",v:4,n:2},{l:"Z",v:10,n:1}
+].forEach(function(t){
+  ScrabbleTiles[t.l] = {"value": t.v, "original-distribution": t.n, "number-remaining": t.n};
+});
+
+// ── Board layout: center row of a standard 15x15 Scrabble board
+var boardLayout = [
+  {type:'tw',  label:'TRIPLE\nWORD'},
+  {type:'n'},
+  {type:'n'},
+  {type:'dl',  label:'DOUBLE\nLETTER'},
+  {type:'n'},
+  {type:'n'},
+  {type:'n'},
+  {type:'star',label:'★'},
+  {type:'n'},
+  {type:'n'},
+  {type:'n'},
+  {type:'dl',  label:'DOUBLE\nLETTER'},
+  {type:'n'},
+  {type:'n'},
+  {type:'tw',  label:'TRIPLE\nWORD'}
+];
+
+var typeClass = {n:'square-normal', dl:'square-dl', tl:'square-tl', dw:'square-dw', tw:'square-tw', star:'square-star'};
+
+// ── Game state ─────
+var tileBag    = [];
+var hand       = [];        // array of {letter, value, id, onBoard}
+var boardSlots = {};        // squareIndex -> {letter, value, tileId}
+var totalScore  = 0;
+var wordsPlayed = 0;
+var tileCounter = 0;
+
+// ── Tile bag ─
+function buildBag() {
+  tileBag = [];
+  Object.keys(ScrabbleTiles).forEach(function(l) {
+    var n = ScrabbleTiles[l]["original-distribution"];
+    for (var i = 0; i < n; i++) tileBag.push({letter: l, value: ScrabbleTiles[l].value});
+  });
+  shuffle(tileBag);
+}
+
+function shuffle(arr) {
+  for (var i = arr.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  }
+}
+
+function drawTiles(n) {
+  var drawn = [];
+  for (var i = 0; i < n && tileBag.length > 0; i++) {
+    var t = tileBag.pop();
+    t.id = 'tile-' + (++tileCounter);
+    t.onBoard = false;
+    drawn.push(t);
+  }
+  return drawn;
+}
+
+// ── Build board ────
+function buildBoard() {
+  var $board = $('#board').empty();
+  boardSlots = {};
+
+  boardLayout.forEach(function(sq, idx) {
+    var cls = typeClass[sq.type] || 'square-normal';
+
+    var innerHtml = '';
+    if (sq.type === 'star') {
+      innerHtml = '<span style="font-size:1.7rem;line-height:1;">★</span>';
+    } else if (sq.label) {
+      innerHtml = '<span style="font-size:0.38rem;white-space:pre-line;text-align:center;line-height:1.3;">' + sq.label + '</span>';
+    }
+
+    var $sq = $('<div>')
+      .addClass('board-square ' + cls)
+      .attr('id', 'sq-' + idx)
+      .attr('data-idx', idx)
+      .html(innerHtml);
+
+    // Each board square is a drop target that only accepts .tile elements
+    $sq.droppable({
+      accept: function($tile) {
+        // Only accept tiles that are draggable and not already placed
+        return $tile.hasClass('tile') && !$tile.hasClass('placed');
+      },
+      tolerance: 'intersect',
+      drop: function(event, ui) {
+        onTileDrop($(this), ui.draggable);
+      },
+      over: function() { $(this).addClass('ui-droppable-hover'); },
+      out:  function() { $(this).removeClass('ui-droppable-hover'); }
+    });
+
+    $board.append($sq);
+  });
+}
+
+// ── Build rack ────
+function buildRack() {
+  var $rack = $('#rack').empty();
+  for (var i = 0; i < 7; i++) {
+    $rack.append($('<div>').addClass('rack-slot').attr('id', 'slot-' + i));
+  }
+}
+
+function renderHand() {
+  $('.rack-slot').empty();
+  var slotIdx = 0;
+  hand.forEach(function(t) {
+    if (!t.onBoard && slotIdx < 7) {
+      var $t = makeTile(t);
+      $('#slot-' + slotIdx).append($t);
+      slotIdx++;
+    }
+  });
+  initDraggables();
+}
+
+function makeTile(t) {
+  return $('<div>')
+    .addClass('tile')
+    .attr('id', t.id)
+    .attr('data-letter', t.letter)
+    .attr('data-value', t.value)
+    .html('<span class="tile-letter">' + t.letter + '</span><span class="tile-value">' + t.value + '</span>');
+}
+
+function initDraggables() {
+  // Only make rack tiles draggable — placed tiles stay locked
+  $('.tile').not('.placed').draggable({
+    revert: 'invalid',      // snaps back if NOT dropped on a valid droppable
+    revertDuration: 250,
+    zIndex: 1000,
+    stack: '.tile',
+    start: function() { $(this).css('opacity', 0.8); },
+    stop:  function() { $(this).css('opacity', 1);   }
+  });
+}
+
+// ── Drop handler ──
+function onTileDrop($square, $tile) {
+  $square.removeClass('ui-droppable-hover');
+  var idx = parseInt($square.data('idx'));
+
+  // Guard: square already occupied — reject so tile reverts
+  if (boardSlots[idx]) {
+    showMessage('That square is already occupied!', 'error');
+    // Returning without doing anything causes droppable to treat this as a
+    // failed drop, but jQuery UI has already "accepted" it at this point.
+    // We handle this by immediately reverting the tile manually.
+    revertTile($tile);
+    return;
+  }
+
+  // Adjacency rule: 2nd tile onward must be next to an existing tile
+  var occupiedKeys = Object.keys(boardSlots);
+  if (occupiedKeys.length > 0) {
+    var adjacent = occupiedKeys.some(function(k) {
+      return Math.abs(parseInt(k) - idx) === 1;
+    });
+    if (!adjacent) {
+      showMessage('Each tile must be placed directly next to another tile!', 'error');
+      revertTile($tile);
+      return;
+    }
+  }
+
+  // Accept the drop
+  var letter = $tile.data('letter');
+  var value  = parseInt($tile.data('value'));
+  var tileId = $tile.attr('id');
+
+  boardSlots[idx] = {letter: letter, value: value, tileId: tileId};
+
+  // Lock the tile: mark as placed, disable dragging
+  $tile.addClass('placed').draggable('disable');
+  // Physically move tile into the square
+  $square.empty().append($tile.css({position: 'static', left: '', top: '', margin: '0'}));
+  $square.addClass('occupied');
+
+  // Update hand state
+  hand.forEach(function(t) { if (t.id === tileId) t.onBoard = true; });
+
+  updateWordDisplay();
+  showMessage('Tile placed!', 'info');
+}
+
+// Manually revert a tile back to its original rack slot position
+function revertTile($tile) {
+  var tileId = $tile.attr('id');
+  // Find which hand entry owns this tile
+  var handEntry = null;
+  hand.forEach(function(t) { if (t.id === tileId) handEntry = t; });
+  if (!handEntry) return;
+
+  // Animate back using jQuery UI's built-in revert
+  // We trigger this by temporarily enabling revert and calling .position()
+  // Simplest reliable approach: just re-render the rack (tile is still in hand state)
+  $tile.animate({
+    top:  $tile.data('ui-draggable').originalPosition.top,
+    left: $tile.data('ui-draggable').originalPosition.left
+  }, 250, function() {
+    // After animation, re-render so tile goes back to its slot cleanly
+    buildRack();
+    renderHand();
+  });
+}
+
+// ── Word helpers ──
+// Returns {indices, letters} if tiles are contiguous, or null if there's a gap
+function getWord() {
+  var indices = Object.keys(boardSlots).map(Number).sort(function(a, b){ return a - b; });
+  if (indices.length === 0) return {indices: [], letters: ''};
+
+  for (var i = 1; i < indices.length; i++) {
+    if (indices[i] !== indices[i-1] + 1) return null; // gap detected
+  }
+  return {
+    indices: indices,
+    letters: indices.map(function(i){ return boardSlots[i].letter; }).join('')
+  };
+}
+
+function calcScore(indices) {
+  var letterSum = 0;
+  var wordMult  = 1;
+  indices.forEach(function(i) {
+    var v  = boardSlots[i].value;
+    var sq = boardLayout[i];
+    if      (sq.type === 'dl')                       { v *= 2; }
+    else if (sq.type === 'tl')                       { v *= 3; }
+    else if (sq.type === 'dw' || sq.type === 'star') { wordMult *= 2; }
+    else if (sq.type === 'tw')                       { wordMult *= 3; }
+    letterSum += v;
+  });
+  return letterSum * wordMult;
+}
+
+function updateWordDisplay() {
+  var w = getWord();
+  if (!w || w.indices.length === 0) {
+    $('#wordDisplay').html('&nbsp;');
+    $('#liveScore').html('&nbsp;');
+    return;
+  }
+  // Gap on board
+  if (w === null) {
+    $('#wordDisplay').text('(tiles not adjacent)');
+    $('#liveScore').html('&nbsp;');
+    return;
+  }
+  var sc = calcScore(w.indices);
+  $('#wordDisplay').text(w.letters);
+  $('#liveScore').text(sc + ' pts  (live)');
+}
+
+// ── Submit word ───
+function submitWord() {
+  if (Object.keys(boardSlots).length === 0) {
+    showMessage('Place at least one tile on the board first!', 'error');
+    return;
+  }
+  var w = getWord();
+  if (w === null) {
+    showMessage('Tiles must be contiguous — no gaps allowed!', 'error');
+    return;
+  }
+
+  var sc = calcScore(w.indices);
+  totalScore  += sc;
+  wordsPlayed += 1;
+  $('#totalScore').text(totalScore);
+  $('#wordsPlayed').text(wordsPlayed);
+
+  // Add to history
+  var $entry = $('<div>').addClass('history-entry')
+    .append($('<span>').addClass('history-word').text(w.letters))
+    .append($('<span>').addClass('history-pts').text('+' + sc + ' pts'));
+  $('#historyList').prepend($entry);
+
+  showMessage('"' + w.letters + '" — ' + sc + ' points!', 'success');
+
+  // Remove used tiles from hand
+  hand = hand.filter(function(t){ return !t.onBoard; });
+
+  // Draw only as many new tiles as needed to bring hand back to 7
+  var needed = 7 - hand.length;
+  var newTiles = drawTiles(needed);
+  newTiles.forEach(function(t){ hand.push(t); });
+  $('#tilesLeft').text(tileBag.length);
+
+  // Clear board and re-render
+  buildBoard();
+  buildRack();
+  renderHand();
+  updateWordDisplay();
+
+  if (tileBag.length === 0 && hand.length === 0) {
+    showMessage('All tiles used — game over! Final score: ' + totalScore, 'success');
+  }
+}
+
+// ── Recall tiles ──
+function recallTiles() {
+  // Mark all hand tiles as not on board
+  hand.forEach(function(t){ t.onBoard = false; });
+  buildBoard();    // clears boardSlots too
+  buildRack();
+  renderHand();
+  updateWordDisplay();
+  showMessage('All tiles recalled to rack.', 'info');
+}
+
+// ── Deal new hand ─
+function dealNewHand() {
+  if (tileBag.length === 0) {
+    showMessage('No tiles left in the bag!', 'error');
+    return;
+  }
+  // Return ALL current hand tiles (rack + board) back to the bag
+  hand.forEach(function(t){
+    tileBag.push({letter: t.letter, value: t.value});
+  });
+  shuffle(tileBag);
+  hand = drawTiles(7);
+  $('#tilesLeft').text(tileBag.length);
+
+  buildBoard();
+  buildRack();
+  renderHand();
+  updateWordDisplay();
+  showMessage('New hand dealt!', 'info');
+}
+
+// ── New game 
+function resetGame() {
+  totalScore  = 0;
+  wordsPlayed = 0;
+  tileCounter = 0;
+  $('#totalScore').text(0);
+  $('#wordsPlayed').text(0);
+  $('#historyList').empty();
+
+  buildBag();
+  hand = drawTiles(7);
+  $('#tilesLeft').text(tileBag.length);
+
+  buildBoard();
+  buildRack();
+  renderHand();
+  updateWordDisplay();
+  showMessage('New game started — good luck!', 'info');
+}
+
+// ── Message helper 
+function showMessage(msg, type) {
+  $('#message').text(msg).attr('class', type || 'info');
+}
+
+// ── Init ────
+$(function() {
+  buildBag();
+  hand = drawTiles(7);
+  $('#tilesLeft').text(tileBag.length);
+  buildBoard();
+  buildRack();
+  renderHand();
+  showMessage('Drag tiles from your rack to the board to form a word!', 'info');
+});
+</script>
+</body>
+</html>
